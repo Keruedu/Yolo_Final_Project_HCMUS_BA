@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 detection_bp = Blueprint('detection', __name__)
 
-# Initialize model (will be loaded when this module is imported)
-model = YOLOModel()
+# Dictionary to store model instances for different model types
+model_instances = {}
+
+# Initialize default model (will be loaded when this module is imported)
+default_model_type = 'yolov5'
+model_instances[default_model_type] = YOLOModel(model_type=default_model_type)
+# Current active model reference
+model = model_instances[default_model_type]
 
 @detection_bp.route('/predict', methods=['POST'])
 def predict():
@@ -31,16 +37,30 @@ def predict():
             return jsonify({'error': 'No image file provided'}), 400
             
         file = request.files['image']
-        
         # Check if filename is empty
         if file.filename == '':
             logger.error("Empty filename submitted")
             return jsonify({'error': 'No image selected'}), 400
+        
+        # Get model type from request (default to yolov5 if not specified)
+        model_type = request.form.get('model', default_model_type)
+        logger.info(f"Using model: {model_type}")
+        
+        # Get or create model instance based on requested type
+        global model
+        if model_type not in model_instances:
+            logger.info(f"Creating new model instance for type: {model_type}")
+            model_instances[model_type] = YOLOModel(model_type=model_type)
+        
+        # Set current model to requested type
+        model = model_instances[model_type]
             
         # Check if file is allowed
         if not is_allowed_file(file.filename, current_app.config['ALLOWED_EXTENSIONS']):
             logger.error(f"File type not allowed: {file.filename}")
             return jsonify({'error': 'File type not allowed'}), 400
+
+        
         
         # Read the image file
         image_bytes = file.read()

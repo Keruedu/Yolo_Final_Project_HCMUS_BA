@@ -1,20 +1,3 @@
-# from flask import current_app
-# import torch
-
-# class YOLOModel:
-#     def __init__(self, model_path):
-#         self.model = self.load_model(model_path)
-
-#     def load_model(self, model_path):
-#         # Load the YOLO model from the specified path
-#         model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
-#         return model
-
-#     def detect_objects(self, image):
-#         # Perform object detection on the input image
-#         results = self.model(image)
-#         return results.pandas().xyxy[0]  # Returns a pandas DataFrame with detections
-
 import torch
 import cv2
 import numpy as np
@@ -37,21 +20,40 @@ class YOLOModel:
         """
         self.model = None
         self.model_type = model_type
+        # Đường dẫn mặc định đến model đã train (có thể thay đổi trong config)
+        self.trained_model_path = os.environ.get('TRAINED_MODEL_PATH', 'app/models/trained/best.pt')
         self.load_model()
         
     def load_model(self):
-        """Load the YOLOv5 model from PyTorch Hub."""
+        """Load the YOLO model based on specified type."""
         logger.info(f"Loading {self.model_type} model...")
         try:
-            if 'yolov5' in self.model_type:
-                # Load YOLOv5 from PyTorch Hub
-                self.model = torch.hub.load('ultralytics/yolov5', self.model_type, pretrained=True)
-            elif 'yolov8' in self.model_type:
+            if self.model_type == 'yolov5':
+                # Load YOLOv5 from PyTorch Hub with the correct model name 'yolov5s'
+                self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+            elif self.model_type.startswith('yolov5') and self.model_type != 'yolov5':
+                # For specific YOLOv5 variants like yolov5s, yolov5m, yolov5l, etc.
+                model_size = self.model_type  # e.g., 'yolov5s', 'yolov5m'
+                self.model = torch.hub.load('ultralytics/yolov5', model_size, pretrained=True)
+            elif self.model_type == 'yolov8':
                 # Load YOLOv8 using ultralytics
                 from ultralytics import YOLO
-                self.model = YOLO(self.model_type)
+                self.model = YOLO('yolov8s.pt')
+            elif self.model_type == 'yolov8-trained':
+                # Load trained YOLOv8 model from local path
+                from ultralytics import YOLO
+                if os.path.exists(self.trained_model_path):
+                    self.model = YOLO(self.trained_model_path)
+                    logger.info(f"Loaded trained model from {self.trained_model_path}")
+                else:
+                    logger.error(f"Trained model not found at {self.trained_model_path}")
+                    raise FileNotFoundError(f"Trained model file not found: {self.trained_model_path}")
             else:
                 raise ValueError(f"Unsupported model type: {self.model_type}")
+            
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            raise
             
             logger.info("Model loaded successfully!")
         except Exception as e:
@@ -73,11 +75,11 @@ class YOLOModel:
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Convert to RGB (YOLOv5 expects RGB)
+        # Convert to RGB (YOLO expects RGB)
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Run inference
-        if 'yolov5' in self.model_type:
+        if self.model_type == 'yolov5':
             results = self.model(image_rgb)
             
             # Process the results
@@ -101,7 +103,8 @@ class YOLOModel:
                     'bbox': [float(x1), float(y1), float(x2), float(y2)]
                 })
                 
-        elif 'yolov8' in self.model_type:
+        elif self.model_type in ['yolov8', 'yolov8-trained']:
+            # Xử lý giống nhau cho cả yolov8 và yolov8-trained
             results = self.model(image_rgb)
             
             # Process the first result (assumes batch size of 1)
