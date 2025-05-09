@@ -40,14 +40,15 @@ class YOLOModel:
                 from ultralytics import YOLO
                 self.model = YOLO('yolov8s.pt')
             elif self.model_type == 'yolov8-trained':
-                # Load trained YOLOv8 model from local path
+                # Load YOLOv8 fruits model from root directory
                 from ultralytics import YOLO
-                if os.path.exists(self.trained_model_path):
-                    self.model = YOLO(self.trained_model_path)
-                    logger.info(f"Loaded trained model from {self.trained_model_path}")
+                fruits_model_path = 'yolov8s_fruits.pt'
+                if os.path.exists(fruits_model_path):
+                    self.model = YOLO(fruits_model_path)
+                    logger.info(f"Loaded fruits model from {fruits_model_path}")
                 else:
-                    logger.error(f"Trained model not found at {self.trained_model_path}")
-                    raise FileNotFoundError(f"Trained model file not found: {self.trained_model_path}")
+                    logger.error(f"Fruits model not found at {fruits_model_path}")
+                    raise FileNotFoundError(f"Fruits model file not found: {fruits_model_path}")
             else:
                 raise ValueError(f"Unsupported model type: {self.model_type}")
             
