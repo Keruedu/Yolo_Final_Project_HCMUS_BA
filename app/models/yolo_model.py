@@ -42,7 +42,7 @@ class YOLOModel:
             elif self.model_type == 'yolov8-trained':
                 # Load YOLOv8 fruits model from root directory
                 from ultralytics import YOLO
-                fruits_model_path = 'yolov8s_fruits.pt'
+                fruits_model_path = 'yolov8s-fruits.pt'
                 if os.path.exists(fruits_model_path):
                     self.model = YOLO(fruits_model_path)
                     logger.info(f"Loaded fruits model from {fruits_model_path}")
@@ -76,11 +76,9 @@ class YOLOModel:
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Convert to RGB (YOLO expects RGB)
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
         # Run inference
         if self.model_type == 'yolov5':
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             results = self.model(image_rgb)
             
             # Process the results
@@ -104,8 +102,9 @@ class YOLOModel:
                     'bbox': [float(x1), float(y1), float(x2), float(y2)]
                 })
                 
-        elif self.model_type in ['yolov8', 'yolov8-trained']:
-            # Xử lý giống nhau cho cả yolov8 và yolov8-trained
+        elif self.model_type == 'yolov8':
+            # Convert to RGB (YOLOv8 standard expects RGB)
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             results = self.model(image_rgb)
             
             # Process the first result (assumes batch size of 1)
@@ -120,16 +119,21 @@ class YOLOModel:
                 'detections': []
             }
             
-            for box in results[0].boxes:
-                bbox = box.xyxy[0].cpu().numpy()  # get box coordinates
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-                class_name = results[0].names[cls]
-                
-                detection_results['detections'].append({
-                    'class': class_name,
-                    'confidence': conf,
-                    'bbox': [float(coord) for coord in bbox]
-                })
-        
+        elif self.model_type == 'yolov8-trained':
+            # Sử dụng trực tiếp ảnh BGR cho model đã train (không chuyển sang RGB)
+            logger.info("Using BGR format directly for yolov8-trained model")
+            results = self.model(image)  # Truyền trực tiếp ảnh BGR
+            
+            # Process the first result
+            processed_img = results[0].plot()
+            
+            # Không cần chuyển đổi lại vì kết quả đã ở dạng BGR
+            
+            # Extract detection details
+            detection_results = {
+                'num_detections': len(results[0].boxes),
+                'detections': []
+            }
+            
+       
         return processed_img, detection_results
