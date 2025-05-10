@@ -114,26 +114,50 @@ class YOLOModel:
             processed_img = cv2.cvtColor(processed_img, cv2.COLOR_RGB2BGR)
             
             # Extract detection details
+            boxes = results[0].boxes
             detection_results = {
-                'num_detections': len(results[0].boxes),
+                'num_detections': len(boxes),
                 'detections': []
             }
             
+            # Lặp qua từng box để trích xuất thông tin
+            for i in range(len(boxes)):
+                box_xyxy = boxes.xyxy[i].cpu().numpy()
+                cls_id = int(boxes.cls[i].item())
+                conf = float(boxes.conf[i].item())
+                
+                detection_results['detections'].append({
+                    'class': results[0].names[cls_id],
+                    'confidence': conf,
+                    'bbox': [float(box_xyxy[0]), float(box_xyxy[1]), float(box_xyxy[2]), float(box_xyxy[3])]
+                })
+            
         elif self.model_type == 'yolov8-trained':
-            # Sử dụng trực tiếp ảnh BGR cho model đã train (không chuyển sang RGB)
+            # Directly use the BGR image for yolov8-trained model
             logger.info("Using BGR format directly for yolov8-trained model")
             results = self.model(image)  # Truyền trực tiếp ảnh BGR
             
             # Process the first result
             processed_img = results[0].plot()
             
-            # Không cần chuyển đổi lại vì kết quả đã ở dạng BGR
-            
             # Extract detection details
+            boxes = results[0].boxes
             detection_results = {
-                'num_detections': len(results[0].boxes),
+                'num_detections': len(boxes),
                 'detections': []
             }
+            
+            # Lặp qua từng box để trích xuất thông tin
+            for i in range(len(boxes)):
+                box_xyxy = boxes.xyxy[i].cpu().numpy()
+                cls_id = int(boxes.cls[i].item())
+                conf = float(boxes.conf[i].item())
+                
+                detection_results['detections'].append({
+                    'class': results[0].names[cls_id],
+                    'confidence': conf,
+                    'bbox': [float(box_xyxy[0]), float(box_xyxy[1]), float(box_xyxy[2]), float(box_xyxy[3])]
+                })
             
        
         return processed_img, detection_results
